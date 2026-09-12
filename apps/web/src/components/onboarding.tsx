@@ -1,78 +1,58 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { FileStep } from "@/components/file-step";
-import type { PackSlot } from "@/lib/pack-types";
+import {
+  LAST_STEP,
+  slotCount,
+  type OnboardingState,
+} from "@/lib/onboarding-steps";
 import type { useCoursePack } from "@/lib/use-course-pack";
-
-const STEPS: Array<{
-  slot: PackSlot;
-  title: string;
-  description: string;
-}> = [
-  {
-    slot: "contents",
-    title: "1. Course contents",
-    description:
-      "Pick the syllabus, units, textbook, or any Drive file that describes what this course covers.",
-  },
-  {
-    slot: "syllabus",
-    title: "2. Course syllabus",
-    description:
-      "Pick the official plan, calendar, grading criteria, or teaching program from Drive.",
-  },
-  {
-    slot: "students",
-    title: "3. Student list",
-    description:
-      "Pick the class roster from Drive (PDF, spreadsheet, or a Classroom export).",
-  },
-];
 
 export function Onboarding({
   pack,
+  onboarding,
   onDone,
 }: {
   pack: ReturnType<typeof useCoursePack>;
-  onDone?: () => void;
+  onboarding: OnboardingState;
+  onDone: () => void;
 }) {
-  const firstIncomplete = useMemo(() => {
-    const index = STEPS.findIndex((step) => pack.pack?.[step.slot].length === 0);
-    return index === -1 ? STEPS.length - 1 : index;
-  }, [pack.pack]);
-  const [stepIndex, setStepIndex] = useState(firstIncomplete);
-  const [moved, setMoved] = useState(false);
-  useEffect(() => {
-    if (!moved) setStepIndex(firstIncomplete);
-  }, [firstIncomplete, moved]);
-  const step = STEPS[Math.min(stepIndex, STEPS.length - 1)];
+  const { steps, index, step, goTo } = onboarding;
   const files = pack.pack?.[step.slot] ?? [];
-  const canAdvance = files.length > 0;
-  const isLast = stepIndex === STEPS.length - 1;
+  const isLast = index === LAST_STEP;
+  const missing = steps.filter((item) => slotCount(pack.pack, item.slot) === 0);
 
   return (
     <div className="ck-onboarding">
-      <ol className="ck-steps-nav" aria-label="Onboarding steps">
-        {STEPS.map((item, index) => {
-          const done = (pack.pack?.[item.slot].length ?? 0) > 0;
+      <ol className="ck-stepper" aria-label="Course setup steps">
+        {steps.map((item, position) => {
+          const count = slotCount(pack.pack, item.slot);
+          const done = count > 0;
           return (
             <li key={item.slot}>
               <button
                 type="button"
+                aria-current={position === index ? "step" : undefined}
                 className={[
                   "ck-step-tab",
-                  index === stepIndex ? "ck-step-tab--current" : "",
+                  position === index ? "ck-step-tab--current" : "",
                   done ? "ck-step-tab--done" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                onClick={() => {
-                  setMoved(true);
-                  setStepIndex(index);
-                }}
+                onClick={() => goTo(position)}
               >
-                {item.title}
+                <span className="ck-step-bullet" aria-hidden="true">
+                  {done ? "✓" : position + 1}
+                </span>
+                <span className="ck-step-tab-label">
+                  {item.label}
+                  <span className="ck-sr-only">
+                    {done
+                      ? ` — ${count} file${count === 1 ? "" : "s"} attached`
+                      : " — no files yet"}
+                  </span>
+                </span>
               </button>
             </li>
           );
@@ -80,8 +60,9 @@ export function Onboarding({
       </ol>
 
       <FileStep
-        title={step.title}
-        description={step.description}
+        label={step.headline}
+        emptyTitle={`Nothing attached for ${lowerFirst(step.label)} yet`}
+        emptyHint={step.emptyHint}
         files={files}
         busy={pack.busy}
         onAttach={(fileIds) => pack.attach(step.slot, fileIds)}
@@ -89,47 +70,56 @@ export function Onboarding({
         leading={
           <button
             type="button"
-            className="ck-btn"
-            disabled={stepIndex === 0}
-            onClick={() => {
-              setMoved(true);
-              setStepIndex((value) => Math.max(0, value - 1));
-            }}
+            className="ck-btn ck-btn--ghost"
+            disabled={index === 0}
+            onClick={() => goTo(index - 1)}
           >
             Back
           </button>
         }
         trailing={
-          !isLast ? (
+          isLast ? (
             <button
               type="button"
               className="ck-btn ck-btn--primary"
-              disabled={!canAdvance}
-              onClick={() => {
-                setMoved(true);
-                setStepIndex((value) => value + 1);
-              }}
+              disabled={Boolean(missing.length) || pack.busy}
+              onClick={onDone}
+            >
+              Finish setup
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="ck-btn ck-btn--primary"
+              disabled={!files.length || pack.busy}
+              onClick={() => goTo(index + 1)}
             >
               Continue
             </button>
-          ) : onDone ? (
-            <button
-              type="button"
-              className="ck-btn ck-btn--primary"
-              disabled={!canAdvance}
-              onClick={onDone}
-            >
-              Done
-            </button>
-          ) : (
-            <p className="ck-local-note">
-              {canAdvance
-                ? "Onboarding complete. You can create a topic."
-                : "Add at least one Drive file to finish."}
-            </p>
           )
         }
       />
+
+      {isLast ? (
+        missing.length ? (
+          <p className="ck-local-note">
+            Still needed: {missing.map((item) => item.label).join(", ")}.
+          </p>
+        ) : (
+          <div className="ck-success-banner" role="status">
+            <span aria-hidden="true">✓</span>
+            <div>
+              <strong>All three course documents are attached</strong>
+              <p>Finish setup to open the topic workspace for this course.</p>
+            </div>
+          </div>
+        )
+      ) : null}
     </div>
   );
+}
+
+/** Lower-case a step label so it reads inside a sentence. */
+function lowerFirst(label: string) {
+  return label.charAt(0).toLowerCase() + label.slice(1);
 }

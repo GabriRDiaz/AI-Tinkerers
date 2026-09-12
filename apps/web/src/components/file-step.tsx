@@ -2,11 +2,13 @@
 
 import { useState, type ReactNode } from "react";
 import { DrivePicker } from "@/components/drive-picker";
+import { FileCard } from "@/components/file-card";
 import type { DriveBrowseItem, PackFile } from "@/lib/pack-types";
 
 export function FileStep({
-  title,
-  description,
+  label,
+  emptyTitle,
+  emptyHint,
   files,
   busy,
   onAttach,
@@ -14,8 +16,9 @@ export function FileStep({
   leading,
   trailing,
 }: {
-  title: string;
-  description: string;
+  label: string;
+  emptyTitle: string;
+  emptyHint: string;
   files: PackFile[];
   busy: boolean;
   onAttach: (fileIds: string[]) => Promise<unknown>;
@@ -31,58 +34,55 @@ export function FileStep({
   }
 
   return (
-    <section className="ck-file-step" aria-labelledby="step-title">
-      <h2 id="step-title">{title}</h2>
-      <p>{description}</p>
+    <section className="ck-file-step" aria-label={label}>
       {files.length ? (
-        <ul className="ck-task-list">
+        <ul className="ck-file-list">
           {files.map((file) => (
             <li key={file.id}>
-              <span aria-hidden="true">○</span>
-              <div className="ck-file-row">
-                <div>
-                  <strong>
-                    {file.url ? (
-                      <a href={file.url} target="_blank" rel="noreferrer">
-                        {file.name}
-                      </a>
-                    ) : (
-                      file.name
-                    )}
-                  </strong>
-                  <span className="ck-muted">
-                    {file.size ? `${(file.size / 1024).toFixed(1)} KB` : "Google Drive"}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="ck-btn ck-btn--tiny"
-                  disabled={busy}
-                  onClick={() => onRemove(file.id)}
-                >
-                  Remove
-                </button>
-              </div>
+              <FileCard
+                file={file}
+                busy={busy}
+                onRemove={() => onRemove(file.id)}
+              />
             </li>
           ))}
         </ul>
       ) : (
-        <p className="ck-empty">No Drive files in this step yet.</p>
-      )}
-      <div className="ck-step-actions">
-        {leading ?? <span />}
-        <div className="ck-step-actions__end">
+        <div className="ck-empty-state">
+          <strong>{emptyTitle}</strong>
+          <p>{emptyHint}</p>
           <button
             type="button"
-            className="ck-btn ck-btn--primary"
+            className="ck-btn"
             disabled={busy}
             onClick={() => setOpen(true)}
           >
             Pick from Drive
           </button>
+        </div>
+      )}
+
+      <p role="status" className="ck-notice">
+        {busy ? "Adding files…" : ""}
+      </p>
+
+      <div className="ck-step-actions">
+        {leading ?? <span />}
+        <div className="ck-step-actions__end">
+          {files.length ? (
+            <button
+              type="button"
+              className="ck-btn"
+              disabled={busy}
+              onClick={() => setOpen(true)}
+            >
+              Add more files
+            </button>
+          ) : null}
           {trailing}
         </div>
       </div>
+
       <DrivePicker
         open={open}
         busy={busy}

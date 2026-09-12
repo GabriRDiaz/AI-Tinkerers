@@ -20,19 +20,28 @@ export function useCoursePack(courseId: string | null, signedIn: boolean) {
   const [pack, setPack] = useState<CoursePack | undefined>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    // Drop the previous course's pack so the UI shows a skeleton, never a stale
+    // or falsely empty onboarding state.
+    setPack(undefined);
     if (!courseId || !signedIn) {
-      setPack(undefined);
+      setLoading(false);
       return undefined;
     }
-    const next = await parsePack(
-      await fetch(`/api/pack?courseId=${encodeURIComponent(courseId)}`, {
-        cache: "no-store",
-      }),
-    );
-    setPack(next);
-    return next;
+    setLoading(true);
+    try {
+      const next = await parsePack(
+        await fetch(`/api/pack?courseId=${encodeURIComponent(courseId)}`, {
+          cache: "no-store",
+        }),
+      );
+      setPack(next);
+      return next;
+    } finally {
+      setLoading(false);
+    }
   }, [courseId, signedIn]);
 
   useEffect(() => {
@@ -140,6 +149,7 @@ export function useCoursePack(courseId: string | null, signedIn: boolean) {
   return {
     pack: current,
     ready: current ? packReady(current) : false,
+    loading,
     error,
     busy,
     refresh,

@@ -24,6 +24,7 @@ export function useClassroom() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [coursesLoaded, setCoursesLoaded] = useState(false);
   const sequence = useRef(0);
   const courseRef = useRef(selectedCourseId);
   courseRef.current = selectedCourseId;
@@ -57,6 +58,7 @@ export function useClassroom() {
       }
       return result.courses[0]?.id ?? null;
     });
+    setCoursesLoaded(true);
     return result.courses;
   }, []);
 
@@ -98,6 +100,7 @@ export function useClassroom() {
       return status;
     } catch (caught) {
       if (request === sequence.current) {
+        setCoursesLoaded(true);
         setError(
           caught instanceof Error
             ? caught.message
@@ -235,6 +238,7 @@ export function useClassroom() {
     setSelectedAssignmentId(null);
     setProposal(undefined);
     setNotice("");
+    setCoursesLoaded(false);
   };
 
   const user: GoogleUser | undefined =
@@ -244,6 +248,7 @@ export function useClassroom() {
     auth,
     user,
     courses,
+    coursesLoaded,
     selectedCourseId,
     assignments,
     selectedAssignmentId,
