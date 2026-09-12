@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
-import "@copilotkit/react-core/v2/styles.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Classroom assistant — Agents, Everywhere",
+  title: "Prepare the course",
   description:
-    "Open a Google Classroom course, ask your assistant, and approve a Drive document.",
+    "Onboard course contents, syllabus, and students from Drive, then add topic notes.",
 };
 
 export default function RootLayout({

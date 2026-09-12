@@ -47,6 +47,35 @@ export async function requestClassroom<T>(path: string): Promise<T> {
   return result;
 }
 
+export async function requestDriveBrowse(
+  folderId = "root",
+  pageToken?: string,
+  options?: { query?: string; shared?: boolean },
+) {
+  const params = new URLSearchParams({ folderId });
+  if (pageToken) params.set("pageToken", pageToken);
+  if (options?.query) params.set("q", options.query);
+  if (options?.shared) params.set("view", "shared");
+  const response = await fetch(`/api/drive/browse?${params}`, {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || `Request failed: HTTP ${response.status}`);
+  }
+  return result as {
+    files: Array<{
+      id: string;
+      name: string;
+      mimeType: string;
+      size: number;
+      url: string | null;
+      folder: boolean;
+    }>;
+    nextPageToken: string | null;
+  };
+}
+
 export async function requestAuthSession() {
   const response = await fetch("/api/auth/session", { cache: "no-store" });
   const result = await response.json();

@@ -18,6 +18,21 @@ class FakeDrive implements DriveDocs {
   async list() {
     return this.docs;
   }
+  async browse() {
+    return { files: [], nextPageToken: null };
+  }
+  async inspect(id: string) {
+    const doc = this.docs.find((item) => item.id === id);
+    if (!doc) throw new Error("missing");
+    return {
+      id: doc.id,
+      name: doc.title,
+      mimeType: "application/vnd.google-apps.document",
+      size: 0,
+      url: doc.url,
+      folder: false,
+    };
+  }
   async get(id: string) {
     const doc = this.docs.find((item) => item.id === id);
     if (!doc) throw new Error("missing");

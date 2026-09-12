@@ -7,15 +7,24 @@ import type {
   ClassroomCourse,
   DriveDoc,
 } from "../classroom-types";
+import type { DriveBrowseItem } from "../pack-types";
 
 export interface ClassroomReader {
   listCourses(): Promise<ClassroomCourse[]>;
   listCourseWork(courseId: string): Promise<ClassroomAssignment[]>;
 }
 
+export type { DriveBrowseItem };
+
 export interface DriveDocs {
   identity(): Promise<{ email: string; name: string }>;
   list(courseId: string): Promise<DriveDoc[]>;
+  browse(
+    folderId?: string,
+    pageToken?: string,
+    options?: { query?: string; shared?: boolean },
+  ): Promise<{ files: DriveBrowseItem[]; nextPageToken: string | null }>;
+  inspect(id: string): Promise<DriveBrowseItem>;
   get(id: string): Promise<DriveDoc>;
   create(
     input: {
@@ -51,7 +60,7 @@ function classroomFailure() {
 
 function driveFailure() {
   return new DomainError(
-    "Unable to reach Google Drive. Confirm the Drive API is enabled and this app has drive.file access.",
+    "Unable to reach Google Drive. Confirm the Drive API is enabled and this app has drive.readonly access.",
   );
 }
 
@@ -162,6 +171,75 @@ export class GoogleDriveDocs implements DriveDocs {
 
   async identity() {
     return this.user;
+  }
+
+  async browse(
+    folderId = "root",
+    pageToken?: string,
+    options?: { query?: string; shared?: boolean },
+  ) {
+    try {
+      const filters = ["trashed=false"];
+      const query = options?.query?.trim();
+      if (query) {
+        filters.push(`name contains '${query.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`);
+      } else if (options?.shared) {
+        filters.push("sharedWithMe = true");
+      } else {
+        filters.push(`'${folderId.replaceAll("'", "\\'")}' in parents`);
+      }
+      const { data } = await this.drive.files.list({
+        q: filters.join(" and "),
+        fields: "nextPageToken, files(id,name,mimeType,size,webViewLink)",
+        pageSize: 50,
+        pageToken,
+        orderBy: query || options?.shared ? "modifiedTime desc" : "folder,name",
+        spaces: "drive",
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+      });
+      const files: DriveBrowseItem[] = [];
+      for (const file of data.files ?? []) {
+        if (!file.id || !file.name) continue;
+        files.push({
+          id: file.id,
+          name: file.name,
+          mimeType: file.mimeType || "application/octet-stream",
+          size: Number(file.size ?? 0),
+          url: safeDriveUrl(file.webViewLink),
+          folder:
+            file.mimeType === "application/vnd.google-apps.folder",
+        });
+      }
+      return { files, nextPageToken: data.nextPageToken ?? null };
+    } catch (error) {
+      if (error instanceof DomainError) throw error;
+      throw driveFailure();
+    }
+  }
+
+  async inspect(id: string) {
+    try {
+      const { data } = await this.drive.files.get({
+        fileId: id,
+        fields: "id,name,mimeType,size,webViewLink,trashed",
+        supportsAllDrives: true,
+      });
+      if (!data.id || !data.name || data.trashed) {
+        throw new DomainError("That Drive file is missing or in the trash.");
+      }
+      return {
+        id: data.id,
+        name: data.name,
+        mimeType: data.mimeType || "application/octet-stream",
+        size: Number(data.size ?? 0),
+        url: safeDriveUrl(data.webViewLink),
+        folder: data.mimeType === "application/vnd.google-apps.folder",
+      };
+    } catch (error) {
+      if (error instanceof DomainError) throw error;
+      throw driveFailure();
+    }
   }
 
   async list(courseId: string) {

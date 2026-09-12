@@ -98,17 +98,23 @@ p {
   padding: 28px;
   min-width: 0;
 }
-.ck-incident-picker {
-  display: flex;
-  align-items: center;
+.ck-course-fields {
+  display: grid;
   gap: 16px;
   padding-bottom: 24px;
   border-bottom: 1px solid var(--border);
 }
+.ck-incident-picker {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 .ck-incident-picker label {
+  flex: 0 0 88px;
   font-size: 12px;
   color: var(--muted);
 }
+.ck-incident-picker input,
 .ck-incident-picker select {
   flex: 1;
   min-width: 0;
@@ -138,6 +144,20 @@ p {
 .ck-detail p {
   color: var(--muted);
   margin-bottom: 16px;
+}
+.ck-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ck-detail-actions .ck-btn {
+  min-width: 120px;
+  min-height: 40px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .ck-more summary {
   font-size: 12px;
@@ -202,7 +222,7 @@ p {
 }
 .ck-task-list li {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
   padding: 10px 0;
   overflow-wrap: anywhere;
@@ -468,6 +488,7 @@ p {
   margin-top: 16px;
 }
 .ck-task-form--stacked input,
+.ck-task-form--stacked select,
 .ck-task-form--stacked textarea {
   width: 100%;
   min-width: 0;
@@ -519,10 +540,158 @@ p {
   font-size: 14px;
   margin-bottom: 8px;
 }
-.ck-approval-actions {
+.ck-approval-actions,
+.ck-step-actions {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   flex-wrap: wrap;
+  margin-top: 20px;
+}
+.ck-step-actions .ck-btn,
+.ck-approval-actions .ck-btn,
+.ck-file-step > .ck-step-actions .ck-btn,
+.ck-signin .ck-btn,
+.ck-auth-badge .ck-btn {
+  min-width: 120px;
+  min-height: 40px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ck-step-actions .ck-local-note {
+  margin: 0;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+}
+.ck-step-actions__end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.ck-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.ck-file-row a {
+  color: inherit;
+}
+.ck-field-label {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ck-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(1, 5, 7, 0.35);
+}
+.ck-picker {
+  width: min(640px, 100%);
+  max-height: min(720px, calc(100dvh - 48px));
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 24px 24px;
+}
+.ck-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.ck-picker-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+.ck-picker-header .ck-btn {
+  min-width: 88px;
+  min-height: 36px;
+}
+.ck-picker-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ck-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+.ck-picker-search input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.ck-picker-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.ck-picker-crumb {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+}
+.ck-picker-crumb:disabled {
+  color: var(--text);
+  text-decoration: none;
+  cursor: default;
+}
+.ck-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.ck-picker-list li + li {
+  border-top: 1px solid var(--border);
+}
+.ck-picker-folder,
+.ck-picker-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: 0;
+  text-align: left;
+  color: inherit;
+}
+.ck-picker-file strong,
+.ck-picker-folder strong {
+  display: block;
 }
 .ck-error {
   color: #a12730;
@@ -571,4 +740,71 @@ p {
 }
 .ck-assignment--selected strong {
   text-decoration: underline;
+}
+.ck-workspace-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 720px;
+}
+.ck-steps-nav {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding: 0;
+  list-style: none;
+}
+.ck-step-tab {
+  width: 100%;
+  text-align: left;
+  background: #f7f7f9;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--muted);
+}
+.ck-step-tab--current {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--surface);
+}
+.ck-step-tab--done {
+  background: #e7f6ee;
+  border-color: #2f8a4e;
+  color: #166534;
+}
+.ck-step-tab--done.ck-step-tab--current {
+  background: #d8f3e3;
+  border-color: #166534;
+  color: #14532d;
+}
+.ck-file-step h2 {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.ck-file-step > p {
+  color: var(--muted);
+}
+.ck-file-step input[type="file"] {
+  font: inherit;
+}
+.ck-adaptations {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 0;
+}
+.ck-adaptations legend {
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ck-adaptations label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.ck-topic-workspace {
+  display: grid;
+  gap: 32px;
 }
