@@ -2,8 +2,8 @@
 
 import { useFrontendTool, useAgentContext } from "@copilotkit/react-core/v2";
 import { z } from "zod";
-import { findIncident, workspaceContext } from "@/lib/incidents";
-import type { WorkplaceControls } from "@/lib/use-workplace";
+import { classroomContext, findCourse } from "@/lib/classroom-context";
+import type { ClassroomControls } from "@/lib/use-classroom";
 
 async function toolResult<T>(action: () => Promise<T>) {
   try {
@@ -14,59 +14,94 @@ async function toolResult<T>(action: () => Promise<T>) {
       message:
         error instanceof Error
           ? error.message
-          : "Workplace operation failed. Check the page for setup details.",
+          : "Classroom or Drive operation failed. Check the page for setup details.",
     };
   }
 }
 
-export function AppControl({
-  selectedId,
-  selectIncident,
-  workplace,
-}: {
-  selectedId: string;
-  selectIncident: (id: string) => void;
-  workplace: WorkplaceControls;
-}) {
-  const { status, propose, retrieve } = workplace;
+export function AppControl({ classroom }: { classroom: ClassroomControls }) {
+  const {
+    selectedCourseId,
+    selectedAssignmentId,
+    courses,
+    assignments,
+    docs,
+    propose,
+    retrieve,
+    selectCourse,
+    selectAssignment,
+  } = classroom;
 
   useAgentContext({
     description:
-      "The incident workspace currently visible to the user, including sample timeline and Ambiguous follow-ups. CRITICAL: propose_followup only prepares a proposal. Only the user's approval button saves it; prose/chat approval never executes a write. Use retrieve_followup or refresh_followups for real reads. Never claim a task was saved without a provider record. Never invent record links.",
+      "The Google Classroom page currently visible to the user, including the selected course, assignments, and Drive documents this app created. CRITICAL: propose_drive_doc only prepares a proposal. Only the user's approval button saves it; prose/chat approval never executes a write. Use retrieve_drive_doc or refresh_drive_docs for real reads. Never claim a file was saved without a Drive record. Never invent file links.",
     value: {
-      ...workspaceContext(
-        selectedId,
-        status?.status === "connected" ? status.tasks : [],
+      auth: classroom.auth?.status ?? "unknown",
+      user: classroom.user ?? null,
+      authError:
+        classroom.auth && classroom.auth.status !== "signed_in"
+          ? classroom.auth.message
+          : classroom.error || null,
+      ...classroomContext(
+        courses,
+        selectedCourseId,
+        assignments,
+        selectedAssignmentId,
+        docs,
       ),
-      workplace: status?.status ?? "unavailable",
-      workplaceError: workplace.error,
-      proposal: workplace.proposal ?? null,
-      lastResult: workplace.notice,
+      proposal: classroom.proposal ?? null,
+      lastResult: classroom.notice,
     },
   });
 
   useFrontendTool(
     {
-      name: "select_incident",
+      name: "select_course",
       description:
-        "Open an existing sample incident in the workspace. Use an ID from availableIncidents.",
-      parameters: z.object({ incidentId: z.string() }),
-      handler: async ({ incidentId }) => {
-        const incident = findIncident(incidentId);
-        selectIncident(incident.id);
-        return `Opened ${incident.id}: ${incident.title}. The visible details and agent context now show this incident.`;
+        "Open an existing Classroom course already returned for this user. Use an ID from availableCourses.",
+      parameters: z.object({ courseId: z.string() }),
+      handler: async ({ courseId }) => {
+        const course = findCourse(courses, courseId);
+        if (!course) {
+          throw new Error(
+            `Unknown course ${courseId}. Choose one of the courses shown on the page.`,
+          );
+        }
+        selectCourse(course.id);
+        return `Opened ${course.name}. The visible details and agent context now show this course.`;
       },
     },
-    [selectIncident],
+    [courses, selectCourse],
   );
 
   useFrontendTool(
     {
-      name: "propose_followup",
+      name: "select_assignment",
       description:
-        "Prepare an Ambiguous task from the selected incident context. Show the exact title and details for the user's approval button. Does not save anything. CRITICAL: wait for the user to click Approve & save to Ambiguous in the page.",
+        "Highlight an assignment from the selected course. Use an ID from the page assignments list.",
+      parameters: z.object({ assignmentId: z.string() }),
+      handler: async ({ assignmentId }) => {
+        const assignment = assignments.find((item) => item.id === assignmentId);
+        if (!assignment) {
+          throw new Error(
+            "Unknown assignment. Use an ID from the assignments currently listed for this course.",
+          );
+        }
+        selectAssignment(assignment.id);
+        return `Selected assignment: ${assignment.title}.`;
+      },
+    },
+    [assignments, selectAssignment],
+  );
+
+  useFrontendTool(
+    {
+      name: "propose_drive_doc",
+      description:
+        "Prepare a Google Doc from the selected course context. Show the exact title and body for the user's approval button. Does not save anything. CRITICAL: wait for the user to click Approve & create in Drive on the page.",
       parameters: z.object({
-        incidentId: z.string(),
+        courseId: z.string().trim().min(1),
+        courseWorkId: z.string().trim().min(1).optional(),
         title: z.string().trim().min(1).max(200),
         details: z.string().trim().min(1).max(4000),
       }),
@@ -81,10 +116,10 @@ export function AppControl({
 
   useFrontendTool(
     {
-      name: "retrieve_followup",
+      name: "retrieve_drive_doc",
       description:
-        "Retrieve an existing Ambiguous task by its actual ID. Read-only; never creates a duplicate.",
-      parameters: z.object({ id: z.uuid() }),
+        "Retrieve an existing Drive document created by this app, by its actual file ID. Read-only; never creates a duplicate.",
+      parameters: z.object({ id: z.string().trim().min(1) }),
       handler: async ({ id }) => toolResult(() => retrieve(id)),
     },
     [retrieve],
@@ -92,13 +127,13 @@ export function AppControl({
 
   useFrontendTool(
     {
-      name: "refresh_followups",
+      name: "refresh_drive_docs",
       description:
-        "Read saved follow-ups for the currently selected incident from Ambiguous. Use after approval or browser refresh to verify persistence.",
+        "Read Drive documents this app created for the currently selected course. Use after approval or browser refresh to verify persistence.",
       parameters: z.object({}),
-      handler: async () => toolResult(() => workplace.refresh()),
+      handler: async () => toolResult(() => classroom.refreshDocs()),
     },
-    [workplace.refresh],
+    [classroom.refreshDocs],
   );
 
   return null;

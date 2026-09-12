@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createFollowupClient } from "./followup-client";
+import { createDocClient } from "./google-client";
+
 test("parallel reads and proposals wait for a single completed session handshake", async () => {
   const urls: string[] = [];
   let sessionReady = false;
@@ -10,7 +11,7 @@ test("parallel reads and proposals wait for a single completed session handshake
   const hold = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const request = createFollowupClient(async (url) => {
+  const request = createDocClient(async (url) => {
     urls.push(url);
     if (url.includes("session=1")) {
       await hold;
@@ -19,19 +20,20 @@ test("parallel reads and proposals wait for a single completed session handshake
     return Response.json({ status: "ready" });
   });
   const reads = [
-    request("?incidentId=INC-1042"),
-    request("?incidentId=INC-1043"),
+    request("?courseId=bio-1"),
+    request("?courseId=hist-1"),
     request("", { operation: "propose" }),
   ];
-  assert.deepEqual(urls, ["/api/followups?session=1"]);
+  assert.deepEqual(urls, ["/api/docs?session=1"]);
   release();
   await Promise.all(reads);
   assert.equal(urls.filter((url) => url.includes("session=1")).length, 1);
   assert.equal(urls.length, 4);
 });
+
 test("a failed handshake can be retried and never sends a proposal", async () => {
   let calls = 0;
-  const request = createFollowupClient(async () => {
+  const request = createDocClient(async () => {
     calls++;
     return new Response(null, { status: 503 });
   });

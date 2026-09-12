@@ -1,121 +1,180 @@
 "use client";
 
-import { useCallback, useState } from "react";
 import {
   CopilotChat,
   useConfigureSuggestions,
 } from "@copilotkit/react-core/v2";
 import { GenerativeUI } from "@/components/generative-ui";
 import { AppControl } from "@/components/app-control";
-import { findIncident, incidents, workspaceContext } from "@/lib/incidents";
-import { useWorkplace } from "@/lib/use-workplace";
-import { WorkplaceFollowups } from "@/components/workplace-followups";
+import { DriveDocs } from "@/components/drive-docs";
+import { findAssignment, findCourse } from "@/lib/classroom-context";
+import { useClassroom } from "@/lib/use-classroom";
 
 export default function Home() {
-  const [selectedId, setSelectedId] = useState<string>(incidents[0].id);
-  const workplace = useWorkplace(selectedId);
-  const { selectedIncident: incident } = workspaceContext(
-    selectedId,
-    workplace.status?.status === "connected" ? workplace.status.tasks : [],
+  const classroom = useClassroom();
+  const course = findCourse(classroom.courses, classroom.selectedCourseId);
+  const assignment = findAssignment(
+    classroom.assignments,
+    classroom.selectedAssignmentId,
   );
-  const selectIncident = useCallback((id: string) => {
-    setSelectedId(findIncident(id).id);
-  }, []);
+  const signedIn = classroom.auth?.status === "signed_in";
 
   useConfigureSuggestions(
     {
-      suggestions: [
-        {
-          title: "Summarize this incident",
-          message:
-            "Summarize the selected incident using the page context. What needs attention?",
-        },
-        {
-          title: "Propose a follow-up",
-          message:
-            "Prepare one useful Ambiguous follow-up for the selected incident. Show me the proposal before it is saved.",
-        },
-      ],
+      suggestions: signedIn
+        ? [
+            {
+              title: "Summarize this course",
+              message:
+                "Summarize the selected Google Classroom course using the page context. What needs attention?",
+            },
+            {
+              title: "Propose a Drive doc",
+              message:
+                "Prepare one useful Google Doc for the selected course or assignment. Show me the proposal before it is saved.",
+            },
+          ]
+        : [],
       available: "before-first-message",
     },
-    [],
+    [signedIn],
   );
 
   return (
     <>
       <GenerativeUI />
-      <AppControl
-        selectedId={selectedId}
-        selectIncident={selectIncident}
-        workplace={workplace}
-      />
+      <AppControl classroom={classroom} />
       <main className="ck-workspace">
         <header className="ck-workspace-header">
           <div>
-            <p className="ck-eyebrow">Agents, everywhere · Web example</p>
-            <h1>Incident assistant</h1>
+            <p className="ck-eyebrow">Agents, everywhere · Classroom</p>
+            <h1>Classroom assistant</h1>
             <p className="ck-intro">
-              Pick an incident. Ask your assistant. Review a follow-up.
+              Open a course. Ask your assistant. Approve a Drive document.
             </p>
           </div>
-          <span className="ck-tag">Sample data</span>
+          <AuthBadge classroom={classroom} />
         </header>
 
         <div className="ck-workspace-grid">
-          <section className="ck-panel" aria-labelledby="incident-title">
-            <div className="ck-incident-picker">
-              <label htmlFor="incident-select">Incident</label>
-              <select
-                id="incident-select"
-                value={selectedId}
-                onChange={(event) => selectIncident(event.target.value)}
-              >
-                {incidents.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.id} · {item.service}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <section className="ck-panel" aria-labelledby="course-title">
+            {!signedIn ? (
+              <SignInPanel classroom={classroom} />
+            ) : (
+              <>
+                <div className="ck-incident-picker">
+                  <label htmlFor="course-select">Course</label>
+                  <select
+                    id="course-select"
+                    value={classroom.selectedCourseId ?? ""}
+                    onChange={(event) =>
+                      classroom.selectCourse(event.target.value)
+                    }
+                    disabled={!classroom.courses.length}
+                  >
+                    {!classroom.courses.length ? (
+                      <option value="">No active courses</option>
+                    ) : (
+                      classroom.courses.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                          {item.section ? ` · ${item.section}` : ""}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
 
-            <div className="ck-detail">
-              <span className="ck-status-label">{incident.status}</span>
-              <h2 id="incident-title">{incident.title}</h2>
-              <p>{incident.summary}</p>
-              <details className="ck-more" key={incident.id}>
-                <summary>Details &amp; timeline</summary>
-                <dl className="ck-detail-facts">
-                  <div>
-                    <dt>Incident lead</dt>
-                    <dd>{incident.owner}</dd>
-                  </div>
-                  <div>
-                    <dt>Severity</dt>
-                    <dd>{incident.severity}</dd>
-                  </div>
-                  <div>
-                    <dt>Last update</dt>
-                    <dd>{incident.updated}</dd>
-                  </div>
-                </dl>
-                <h3>Impact</h3>
-                <p>{incident.impact}</p>
-                <h3>Timeline</h3>
-                <ol className="ck-timeline">
-                  {incident.timeline.map((event) => (
-                    <li key={event.time}>
-                      <time>{event.time} UTC</time>
+                {course ? (
+                  <div className="ck-detail">
+                    <span className="ck-status-label">
+                      {course.courseState ?? "ACTIVE"}
+                    </span>
+                    <h2 id="course-title">{course.name}</h2>
+                    <p>
+                      {course.descriptionHeading ||
+                        "No course heading from Classroom."}
+                    </p>
+                    <dl className="ck-detail-facts">
                       <div>
-                        <strong>{event.author}</strong>
-                        <p>{event.detail}</p>
+                        <dt>Section</dt>
+                        <dd>{course.section || "—"}</dd>
                       </div>
-                    </li>
-                  ))}
-                </ol>
-              </details>
-            </div>
+                      <div>
+                        <dt>Room</dt>
+                        <dd>{course.room || "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>Assignments</dt>
+                        <dd>{classroom.assignments.length}</dd>
+                      </div>
+                    </dl>
+                    {course.alternateLink ? (
+                      <p>
+                        <a
+                          href={course.alternateLink}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open in Classroom
+                        </a>
+                      </p>
+                    ) : null}
 
-            <WorkplaceFollowups incidentId={selectedId} workplace={workplace} />
+                    <details className="ck-more" key={course.id} open>
+                      <summary>Assignments</summary>
+                      {classroom.assignments.length ? (
+                        <ol className="ck-timeline">
+                          {classroom.assignments.map((item) => (
+                            <li key={item.id}>
+                              <time>{item.dueDate || "No due date"}</time>
+                              <div>
+                                <button
+                                  type="button"
+                                  className={
+                                    item.id === classroom.selectedAssignmentId
+                                      ? "ck-assignment ck-assignment--selected"
+                                      : "ck-assignment"
+                                  }
+                                  onClick={() =>
+                                    classroom.selectAssignment(item.id)
+                                  }
+                                >
+                                  <strong>{item.title}</strong>
+                                </button>
+                                <p>
+                                  {item.state || "PUBLISHED"}
+                                  {item.workType ? ` · ${item.workType}` : ""}
+                                </p>
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p className="ck-empty">
+                          No coursework returned for this course.
+                        </p>
+                      )}
+                      {assignment ? (
+                        <p className="ck-local-note">
+                          Selected assignment: {assignment.title}
+                        </p>
+                      ) : null}
+                    </details>
+                  </div>
+                ) : (
+                  <div className="ck-setup-note">
+                    <strong>No courses to show</strong>
+                    <p>
+                      This Google account has no active Classroom courses the
+                      APIs can list. Join or create a course, then refresh.
+                    </p>
+                  </div>
+                )}
+
+                <DriveDocs classroom={classroom} />
+              </>
+            )}
           </section>
 
           <section
@@ -124,18 +183,114 @@ export default function Home() {
           >
             <header className="ck-assistant-header">
               <h2 id="assistant-title">Ask assistant</h2>
-              <p>It can read this incident and prepare follow-ups.</p>
+              <p>
+                It can read this course and prepare a Drive document for
+                approval.
+              </p>
             </header>
             <CopilotChat
               className="ck-chat"
               labels={{
-                welcomeMessageText: "What needs attention?",
-                chatInputPlaceholder: "Ask about this incident…",
+                welcomeMessageText: signedIn
+                  ? "What should we do with this course?"
+                  : "Sign in with Google to load a course.",
+                chatInputPlaceholder: signedIn
+                  ? "Ask about this course…"
+                  : "Sign in first…",
               }}
             />
           </section>
         </div>
       </main>
     </>
+  );
+}
+
+function AuthBadge({
+  classroom,
+}: {
+  classroom: ReturnType<typeof useClassroom>;
+}) {
+  if (classroom.auth?.status === "signed_in") {
+    return (
+      <div className="ck-auth-badge">
+        <span className="ck-tag">{classroom.user?.email}</span>
+        <button type="button" className="ck-btn" onClick={classroom.signOut}>
+          Sign out
+        </button>
+      </div>
+    );
+  }
+  if (classroom.auth?.status === "unconfigured") {
+    return <span className="ck-tag">Google OAuth not configured</span>;
+  }
+  return <span className="ck-tag">Not signed in</span>;
+}
+
+function SignInPanel({
+  classroom,
+}: {
+  classroom: ReturnType<typeof useClassroom>;
+}) {
+  const params =
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search);
+  const googleError = params?.get("google_error");
+  return (
+    <div className="ck-signin">
+      <h2 id="course-title">Connect Google Classroom</h2>
+      <p>
+        Sign in to load your real courses and create a Google Doc in Drive after
+        you approve it on this page.
+      </p>
+      {classroom.auth?.status === "unconfigured" ? (
+        <div className="ck-setup-note">
+          <strong>Connect a throwaway Google account</strong>
+          <p>{classroom.auth.message}</p>
+          <ol className="ck-setup-steps">
+            <li>
+              Create one empty class at{" "}
+              <a href="https://classroom.google.com" target="_blank" rel="noreferrer">
+                classroom.google.com
+              </a>
+              .
+            </li>
+            <li>
+              In{" "}
+              <a
+                href="https://console.cloud.google.com/apis/library"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Google Cloud
+              </a>
+              , enable Classroom API and Drive API.
+            </li>
+            <li>
+              OAuth consent: External, Testing, add that Gmail as a test user.
+            </li>
+            <li>
+              Create a Web client. Redirect URI must be{" "}
+              <code>http://127.0.0.1:3100/api/auth/google/callback</code>.
+            </li>
+            <li>
+              Paste <code>GOOGLE_CLIENT_ID</code> and{" "}
+              <code>GOOGLE_CLIENT_SECRET</code> into root <code>.env</code> and
+              restart the web app.
+            </li>
+          </ol>
+        </div>
+      ) : (
+        <a className="ck-btn ck-btn--primary" href="/api/auth/google">
+          Sign in with Google
+        </a>
+      )}
+      {(googleError || classroom.error) && (
+        <p role="alert" className="ck-error">
+          {googleError || classroom.error}
+        </p>
+      )}
+    </div>
   );
 }

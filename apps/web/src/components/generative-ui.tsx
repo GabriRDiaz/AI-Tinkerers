@@ -16,13 +16,13 @@
 import { useComponent, useHumanInTheLoop } from "@copilotkit/react-core/v2";
 import { z } from "zod";
 
-import { IncidentCard, Timeline } from "./streamed-cards";
+import { CourseCard, Timeline } from "./streamed-cards";
 
 export function GenerativeUI() {
   useComponent({
-    name: "incident_card",
+    name: "course_card",
     description:
-      "Draw the current state of the incident as a card. Call this once you have read the context, and again when the picture changes.",
+      "Draw the current state of the selected Classroom course as a card. Call this once you have read the context, and again when the picture changes.",
     parameters: z.object({
       headline: z.string().describe("What is broken, in under ten words."),
       summary: z.string().describe("Who or what is affected."),
@@ -30,13 +30,13 @@ export function GenerativeUI() {
       nextSteps: z.array(z.string()).max(3).default([]),
       tone: z.enum(["neutral", "good", "attention"]).default("neutral"),
     }),
-    render: IncidentCard,
+    render: CourseCard,
   });
 
   useComponent({
-    name: "timeline",
+    name: "assignment_timeline",
     description:
-      "Draw an ordered timeline of what happened when. Call this when there are three or more events worth ordering.",
+      "Draw an ordered table of course assignments. Call this when there are three or more assignments worth ordering.",
     parameters: z.object({
       title: z.string().optional(),
       columns: z.array(z.string()).min(1).max(4),
@@ -58,7 +58,7 @@ export function GenerativeUI() {
   useHumanInTheLoop({
     name: "propose_action",
     description:
-      "Ask for approval before anything that touches production. Call this FIRST and only continue if it returns approval.",
+      "Ask before a suggested Classroom or Drive action that is not the page Drive-document write. The page approval button is the only way to create a Drive file.",
     parameters: z.object({
       action: z.string().describe("What you are about to do, in one plain sentence."),
       blastRadius: z.string().describe("What this affects if it goes wrong."),

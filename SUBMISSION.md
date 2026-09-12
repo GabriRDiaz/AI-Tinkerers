@@ -9,24 +9,24 @@ Choose your city on the [global event page](https://aitinkerers.org/hackathons/g
 - [ ] We identify inherited templates, libraries, prompts, components, and starter code separately from our event work
 
 **What we inherited**
-<!-- Include this starter kit and any reused examples. -->
+Agents, Everywhere starter kit: Next.js CopilotKit web runtime (`apps/web` providers, `/api/copilotkit`, `packages/agent-core` model adapter and `BuiltInAgent` factory), page-context / frontend-tool / approval-before-write pattern, and unused Slack, mobile, Exa, Auth0, and Ambiguous starter surfaces.
 
 **What we built during the hackathon**
-<!-- Describe the new core interaction and point to its implementation. Running the supplied incident demo alone does not establish a new project. -->
+Google user OAuth, Classroom course/assignment reads, Drive document create with page approval and read-back. Implementation lives in `apps/web/src/app/api/auth`, `apps/web/src/app/api/classroom`, `apps/web/src/app/api/docs`, `apps/web/src/lib/server/google-*.ts`, `apps/web/src/lib/server/doc-approvals.ts`, and the Classroom page/tools in `apps/web/src/app/page.tsx`, `apps/web/src/components/app-control.tsx`, and `apps/web/src/components/drive-docs.tsx`. The incident/Ambiguous demo domain was replaced.
 
 ## Title and description
 
 **What you built**
-<!-- Explain the complete interaction your demo shows. -->
+A web Classroom assistant: sign in with Google, open a live course, ask the agent about the visible assignments, then approve a Google Doc that is created in Drive and can be read back after refresh.
 
 **Who it is for**
-<!-- Name a person in a concrete situation. -->
+A teacher (or student) already looking at a Google Classroom course who needs a course-aware document without leaving the page.
 
 **Why the context matters**
-<!-- What did the agent know or do because it lived in this surface? -->
+Without the selected course and assignment on the page, the agent cannot choose the right Classroom record or attach the Drive file to that course. A standalone chatbox would require the user to paste IDs and links.
 
 **Sponsor technologies used**
-<!-- Name the tools you actually used and the visible contribution of each. -->
+OpenAI (or OpenRouter) for the model. CopilotKit React for page context, frontend tools, and chat UI. Google Classroom and Drive are the live data and write targets (not kit sponsors).
 
 ## Evidence for the judging criteria
 

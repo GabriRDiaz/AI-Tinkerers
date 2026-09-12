@@ -21,7 +21,8 @@ body {
 }
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 button,
@@ -530,4 +531,44 @@ p {
   border-radius: 8px;
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+.ck-auth-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.ck-signin h2 {
+  font-size: 24px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+.ck-signin p {
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.ck-signin .ck-btn--primary {
+  display: inline-block;
+  text-decoration: none;
+}
+.ck-setup-steps {
+  margin: 12px 0 0;
+  padding-left: 1.2rem;
+  color: var(--text);
+  font-size: 13px;
+}
+.ck-setup-steps li + li {
+  margin-top: 8px;
+}
+.ck-assignment {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+}
+.ck-assignment--selected strong {
+  text-decoration: underline;
 }

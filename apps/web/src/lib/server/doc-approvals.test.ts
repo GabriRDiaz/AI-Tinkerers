@@ -3,59 +3,67 @@ import test, { type TestContext } from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FollowupService } from "./followups";
-import type { Workplace, WorkplaceTask } from "./workplace";
+import { DocApprovalService } from "./doc-approvals";
+import type { DriveDocs } from "./google-clients";
+import type { DriveDoc } from "../classroom-types";
 
 const session = "a".repeat(64);
 const input = {
-  incidentId: "INC-1042",
-  title: "Check pool metrics",
-  details: "Compare before and after deploy.",
+  courseId: "bio-1",
+  title: "Lab rubric",
+  details: "Score the onion cell drawings.",
 };
-class FakeWorkplace implements Workplace {
-  workspaceId = "workspace-a";
-  tasks: WorkplaceTask[] = [];
+
+class FakeDrive implements DriveDocs {
+  email = "teacher@school.edu";
+  docs: DriveDoc[] = [];
   creates = 0;
   reads = 0;
   failure: "before" | "after" | undefined;
   async identity() {
-    return { id: "user-a", workspaceId: this.workspaceId, name: "Demo agent" };
+    return { email: this.email, name: "Teacher" };
   }
-  async list(marker: string) {
+  async list(courseId: string) {
     this.reads++;
-    return this.tasks.filter((t) => t.description.includes(marker));
+    return this.docs.filter((doc) => doc.courseId === courseId);
   }
   async get(id: string) {
     this.reads++;
-    const task = this.tasks.find((t) => t.id === id);
-    if (!task) throw new Error("not found");
-    return task;
+    const doc = this.docs.find((item) => item.id === id);
+    if (!doc) throw new Error("not found");
+    return doc;
   }
   async create(
-    title: string,
-    description: string,
+    draft: {
+      title: string;
+      description: string;
+      details: string;
+      courseId: string;
+    },
     beforeWrite: () => Promise<void>,
   ) {
     await beforeWrite();
     this.creates++;
     if (this.failure === "before") throw new Error("provider unavailable");
-    const task = {
-      id: "11111111-1111-4111-8111-111111111111",
-      title,
-      description,
-      url: null,
+    const doc = {
+      id: "drive-file-1",
+      title: draft.title,
+      description: draft.description,
+      url: "https://docs.google.com/document/d/drive-file-1",
+      courseId: draft.courseId,
     };
-    this.tasks.push(task);
+    this.docs.push(doc);
     if (this.failure === "after") throw new Error("lost response");
-    return task;
+    return doc;
   }
 }
+
 async function fixture(t: TestContext) {
-  const directory = await mkdtemp(join(tmpdir(), "web-followups-"));
+  const directory = await mkdtemp(join(tmpdir(), "web-docs-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const provider = new FakeWorkplace();
+  const provider = new FakeDrive();
   let now = Date.now();
-  const service = new FollowupService(provider, directory, () => now);
+  const service = new DocApprovalService(provider, directory, () => now);
   return {
     service,
     provider,
@@ -70,9 +78,9 @@ test("a proposal performs no write; approval writes exactly the displayed fields
   const { service, provider } = await fixture(t);
   const proposal = await service.propose(session, input);
   assert.equal(provider.creates, 0);
-  const task = await service.approve(session, proposal.id);
-  assert.equal(task.title, proposal.title);
-  assert.equal(task.description, proposal.description);
+  const doc = await service.approve(session, proposal.id);
+  assert.equal(doc.title, proposal.title);
+  assert.equal(doc.description, proposal.description);
   assert.equal(provider.creates, 1);
   assert.ok(provider.reads > 0);
 });
@@ -90,27 +98,27 @@ test("missing, foreign-session, denied, and expired proposals cannot write", asy
   assert.equal(provider.creates, 0);
 });
 
-test("workspace changes invalidate the exact consent", async (t) => {
+test("account changes invalidate the exact consent", async (t) => {
   const { service, provider } = await fixture(t);
   const proposal = await service.propose(session, input);
-  provider.workspaceId = "workspace-b";
-  await assert.rejects(service.approve(session, proposal.id), /workspace/);
+  provider.email = "other@school.edu";
+  await assert.rejects(service.approve(session, proposal.id), /account/);
   assert.equal(provider.creates, 0);
 });
 
-test("concurrent approval and restart cannot duplicate a saved task; refresh reads the provider", async (t) => {
+test("concurrent approval and restart cannot duplicate a saved file; refresh reads Drive", async (t) => {
   const { service, provider, directory } = await fixture(t);
-  const p = await service.propose(session, input);
+  const proposal = await service.propose(session, input);
   const results = await Promise.allSettled([
-    service.approve(session, p.id),
-    service.approve(session, p.id),
+    service.approve(session, proposal.id),
+    service.approve(session, proposal.id),
   ]);
-  assert.ok(results.some((r) => r.status === "fulfilled"));
+  assert.ok(results.some((result) => result.status === "fulfilled"));
   assert.equal(provider.creates, 1);
-  const restarted = new FollowupService(provider, directory);
-  await restarted.approve(session, p.id);
+  const restarted = new DocApprovalService(provider, directory);
+  await restarted.approve(session, proposal.id);
   const before = provider.reads;
-  assert.equal((await restarted.list("INC-1042"))[0].id, provider.tasks[0].id);
+  assert.equal((await restarted.list("bio-1"))[0].id, provider.docs[0].id);
   assert.ok(provider.reads > before);
   const another = await restarted.propose(session, input);
   await restarted.approve(session, another.id);
@@ -119,33 +127,31 @@ test("concurrent approval and restart cannot duplicate a saved task; refresh rea
 
 test("an uncertain write is never retried, including after restart and a new proposal", async (t) => {
   const { service, provider, directory } = await fixture(t);
-  const p = await service.propose(session, input);
+  const proposal = await service.propose(session, input);
   provider.failure = "before";
-  await assert.rejects(service.approve(session, p.id), /uncertain/);
+  await assert.rejects(service.approve(session, proposal.id), /uncertain/);
   provider.failure = undefined;
-  const restarted = new FollowupService(provider, directory);
-  await assert.rejects(restarted.approve(session, p.id), /uncertain/);
+  const restarted = new DocApprovalService(provider, directory);
+  await assert.rejects(restarted.approve(session, proposal.id), /uncertain/);
   const another = await restarted.propose(session, input);
   await assert.rejects(restarted.approve(session, another.id), /uncertain/);
   assert.equal(provider.creates, 1);
 });
 
-test("a lost create reply is reconciled from Ambiguous without a second create", async (t) => {
+test("a lost create reply is reconciled from Drive without a second create", async (t) => {
   const { service, provider, directory } = await fixture(t);
-  const p = await service.propose(session, input);
+  const proposal = await service.propose(session, input);
   provider.failure = "after";
-  await assert.rejects(service.approve(session, p.id), /uncertain/);
-  const restarted = new FollowupService(provider, directory);
-  const task = await restarted.approve(session, p.id);
-  assert.equal(task.id, provider.tasks[0].id);
+  await assert.rejects(service.approve(session, proposal.id), /uncertain/);
+  const restarted = new DocApprovalService(provider, directory);
+  const doc = await restarted.approve(session, proposal.id);
+  assert.equal(doc.id, provider.docs[0].id);
   assert.equal(provider.creates, 1);
 });
 
 test("invalid proposal inputs fail before provider writes", async (t) => {
   const { service, provider } = await fixture(t);
-  await assert.rejects(
-    service.propose(session, { ...input, incidentId: "unknown" }),
-  );
+  await assert.rejects(service.propose(session, { ...input, courseId: "" }));
   await assert.rejects(service.propose(session, { ...input, title: " " }));
   await assert.rejects(
     service.propose(session, { ...input, details: "x".repeat(4001) }),
@@ -153,16 +159,16 @@ test("invalid proposal inputs fail before provider writes", async (t) => {
   assert.equal(provider.creates, 0);
 });
 
-test("schema discovery failure before the write guard remains retryable", async (t) => {
+test("create failure before the write guard remains retryable", async (t) => {
   const { service, provider } = await fixture(t);
   const original = provider.create.bind(provider);
   provider.create = async () => {
     throw new Error("schema unavailable");
   };
-  const p = await service.propose(session, input);
-  await assert.rejects(service.approve(session, p.id), /schema/);
+  const proposal = await service.propose(session, input);
+  await assert.rejects(service.approve(session, proposal.id), /schema/);
   provider.create = original;
-  await service.approve(session, p.id);
+  await service.approve(session, proposal.id);
   assert.equal(provider.creates, 1);
 });
 
@@ -173,9 +179,9 @@ test("read-back fields must match the exact approved payload", async (t) => {
     ...(await original(id)),
     title: "Unexpected changed title",
   });
-  const p = await service.propose(session, input);
+  const proposal = await service.propose(session, input);
   await assert.rejects(
-    service.approve(session, p.id),
+    service.approve(session, proposal.id),
     /differs from the approved fields/,
   );
   assert.equal(provider.creates, 1);
